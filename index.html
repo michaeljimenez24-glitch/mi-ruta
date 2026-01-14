@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RutaOptima - Optimizador de Entregas</title>
+    <title>RutaOptima Pro</title>
     
-    <!-- Metadatos para PWA -->
+    <!-- PWA Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="RutaOptima">
@@ -13,270 +13,242 @@
     <meta name="theme-color" content="#4f46e5">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2850/2850358.png">
 
+    <!-- Frameworks -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     
     <style>
-        .stop-card { transition: all 0.2s ease; }
-        .stop-card:hover { transform: translateY(-2px); }
-        .loading-spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #4f46e5;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
-        
-        /* Estilo para items completados */
-        .done-item {
-            background-color: #f3f4f6 !important;
-            border-color: #e5e7eb !important;
-            opacity: 0.7;
-        }
+        #map { height: 320px; width: 100%; border-radius: 16px; z-index: 10; }
+        .stop-card { transition: all 0.2s ease; }
+        .done-item { opacity: 0.5; background-color: #f9fafb !important; border-color: #e5e7eb !important; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="bg-gray-50 min-h-screen font-sans">
+<body class="bg-gray-100 min-h-screen font-sans">
 
-    <div class="max-w-md mx-auto bg-white min-h-screen shadow-lg flex flex-col">
+    <div class="max-w-md mx-auto bg-white min-h-screen shadow-2xl flex flex-col relative">
+        
         <!-- Header -->
-        <header class="bg-indigo-600 p-6 text-white shadow-md sticky top-0 z-40">
+        <header class="bg-indigo-600 p-5 text-white sticky top-0 z-50 shadow-md">
             <div class="flex justify-between items-center">
                 <div>
-                    <h1 class="text-2xl font-bold">RutaOptima</h1>
-                    <p class="text-indigo-100 text-sm">Control de entregas y ruta</p>
+                    <h1 class="text-xl font-black italic tracking-tighter">RUTAOPTIMA <span class="text-[10px] bg-yellow-400 text-indigo-900 px-1.5 py-0.5 rounded ml-1 font-bold tracking-normal">PRO</span></h1>
                 </div>
-                <div id="ocrLoader" class="hidden bg-white/20 px-3 py-1 rounded-full text-xs flex items-center gap-2">
-                    <div class="loading-spinner"></div>
-                    Leyendo...
+                <div id="ocrLoader" class="hidden flex items-center gap-2 text-xs bg-indigo-500 px-3 py-1.5 rounded-full">
+                    <svg class="w-4 h-4 spinner" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span>Escaneando...</span>
                 </div>
             </div>
         </header>
 
-        <!-- Camera Section -->
-        <div id="cameraContainer" class="hidden fixed inset-0 z-50 bg-black flex flex-col">
+        <!-- Tabs -->
+        <nav class="flex border-b bg-white sticky top-[68px] z-40 shadow-sm">
+            <button onclick="switchTab('lista')" id="tab-lista" class="flex-1 py-4 text-xs font-bold border-b-4 border-indigo-600 text-indigo-600">LISTA</button>
+            <button onclick="switchTab('mapa')" id="tab-mapa" class="flex-1 py-4 text-xs font-bold border-b-4 border-transparent text-gray-400">MAPA</button>
+        </nav>
+
+        <!-- Cámara -->
+        <div id="cameraContainer" class="hidden fixed inset-0 z-[100] bg-black flex flex-col">
             <video id="video" class="w-full flex-grow object-cover" autoplay playsinline></video>
-            <canvas id="canvas" class="hidden"></canvas>
-            <div class="p-6 bg-black flex justify-between items-center pb-12">
-                <button onclick="stopCamera()" class="text-white px-4 py-2 bg-white/10 rounded-lg">Cancelar</button>
-                <button onclick="takeSnapshot()" class="w-20 h-20 bg-white rounded-full border-8 border-gray-600 active:scale-95 transition-transform"></button>
-                <div class="w-20"></div>
+            <div class="p-10 bg-black flex justify-between items-center pb-16">
+                <button onclick="stopCamera()" class="text-white font-bold bg-gray-800 px-4 py-2 rounded-lg text-sm">Cerrar</button>
+                <button onclick="takeSnapshot()" class="w-20 h-20 bg-white rounded-full border-[6px] border-gray-600 active:scale-90 transition-transform"></button>
+                <div class="w-12"></div>
             </div>
         </div>
 
-        <!-- Main Content -->
-        <main class="flex-grow p-4">
-            
-            <!-- Input Section -->
-            <div class="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Añadir Dirección</label>
-                <div class="flex gap-2">
-                    <input type="text" id="addressInput" placeholder="Dirección o usa la cámara..." 
-                        class="flex-grow p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none text-sm">
-                    
-                    <button onclick="startCamera()" class="bg-amber-500 text-white p-3 rounded-lg active:scale-95 shadow-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        </svg>
-                    </button>
-
-                    <button onclick="addStop()" class="bg-indigo-600 text-white p-3 rounded-lg active:scale-95 shadow-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                    </button>
+        <main class="flex-grow p-4 overflow-y-auto bg-gray-50/50">
+            <!-- Lista -->
+            <div id="content-lista" class="tab-content active">
+                <div class="bg-white rounded-2xl border border-gray-200 p-4 mb-6 shadow-sm">
+                    <div class="flex gap-2">
+                        <input type="text" id="addressInput" placeholder="Dirección o link de WhatsApp..." 
+                            class="flex-grow p-3 bg-gray-50 rounded-xl border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                        <button onclick="startCamera()" class="bg-amber-100 text-amber-600 p-3 rounded-xl border border-amber-200">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        </button>
+                        <button onclick="addStop()" class="bg-indigo-600 text-white px-5 rounded-xl font-bold text-xl">+</button>
+                    </div>
                 </div>
+                <div id="stopsList" class="space-y-3 pb-32"></div>
             </div>
 
-            <!-- Actions -->
-            <div class="flex gap-2 mb-6">
-                <button onclick="optimizeRoute()" class="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold shadow-md active:scale-95 flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clip-rule="evenodd" />
-                    </svg>
-                    <span>Optimizar Orden</span>
-                </button>
-                <button onclick="clearStops()" class="bg-gray-200 text-gray-600 px-4 py-3 rounded-xl font-medium active:scale-95">
-                    Borrar Todo
-                </button>
-            </div>
-
-            <!-- List Section -->
-            <div id="stopsList" class="space-y-3 pb-20"></div>
-
-            <!-- Empty State -->
-            <div id="emptyState" class="text-center py-12 text-gray-400">
-                <p>Lista vacía.</p>
-                <p class="text-xs mt-1 italic">Agregue paradas para comenzar el reparto.</p>
+            <!-- Mapa -->
+            <div id="content-mapa" class="tab-content">
+                <div id="map" class="shadow-lg border border-gray-200 mb-6 bg-gray-200"></div>
+                <div id="orderSummary" class="text-xs font-bold text-gray-600 space-y-3 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                    <p class="text-gray-400 italic">No hay destinos cargados.</p>
+                </div>
             </div>
         </main>
 
-        <!-- Stats Floating Footer -->
-        <footer class="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-white border-t border-gray-200 flex justify-around items-center shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-30">
+        <!-- Botón Optimizar -->
+        <button onclick="optimizeRoute()" class="fixed bottom-24 right-6 bg-green-500 text-white p-5 rounded-2xl shadow-2xl active:scale-90 z-40 border-b-4 border-green-700">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </button>
+
+        <!-- Footer -->
+        <footer class="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-5 bg-white border-t flex justify-around items-center z-50">
             <div class="text-center">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wider">Total</p>
-                <p id="countTotal" class="text-xl font-black text-indigo-600">0</p>
+                <p class="text-[9px] text-gray-400 font-bold uppercase">Paquetes</p>
+                <p id="countTotal" class="text-xl font-black text-indigo-700">0</p>
             </div>
-            <div class="h-8 w-px bg-gray-200"></div>
             <div class="text-center">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wider">Visitadas</p>
-                <p id="countDone" class="text-xl font-black text-green-600">0</p>
+                <p class="text-[9px] text-gray-400 font-bold uppercase">Entregados</p>
+                <p id="countDone" class="text-xl font-black text-green-500">0</p>
             </div>
-            <div class="h-8 w-px bg-gray-200"></div>
-            <div class="text-center">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wider">Pendientes</p>
-                <p id="countPending" class="text-xl font-black text-amber-500">0</p>
-            </div>
+            <button onclick="clearStops()" class="text-[9px] bg-red-50 text-red-500 px-4 py-2 rounded-xl font-bold border border-red-100">LIMPIAR</button>
         </footer>
     </div>
 
     <script>
         let stops = [];
+        let map, markerLayer;
         const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const cameraContainer = document.getElementById('cameraContainer');
+        const addressInput = document.getElementById('addressInput');
 
         window.onload = () => {
-            const savedStops = localStorage.getItem('ruta_optima_stops');
-            if (savedStops) {
-                stops = JSON.parse(savedStops);
+            initMap();
+            const saved = localStorage.getItem('ruta_pro_vFinal');
+            if (saved) {
+                stops = JSON.parse(saved);
                 renderStops();
+                updateMapMarkers();
             }
         };
 
-        function saveToLocal() {
-            localStorage.setItem('ruta_optima_stops', JSON.stringify(stops));
+        function initMap() {
+            map = L.map('map', { zoomControl: false }).setView([18.4861, -69.9312], 13);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+            markerLayer = L.layerGroup().addTo(map);
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`content-${tab}`).classList.add('active');
+            document.querySelectorAll('nav button').forEach(b => {
+                b.classList.remove('border-indigo-600', 'text-indigo-600');
+                b.classList.add('border-transparent', 'text-gray-400');
+            });
+            document.getElementById(`tab-${tab}`).classList.add('border-indigo-600', 'text-indigo-600');
+            if(tab === 'mapa') setTimeout(() => { map.invalidateSize(); updateMapMarkers(); }, 200);
+        }
+
+        function addStop() {
+            let text = addressInput.value.trim();
+            if (!text) return;
+            // Detección de enlaces
+            if (text.includes('google.com/maps') || text.includes('maps.app.goo.gl')) {
+                text = "📍 Ubicación WhatsApp";
+            }
+            stops.push({ 
+                id: Date.now(), address: text, done: false, 
+                lat: 18.4861 + (Math.random() - 0.5) * 0.05, // Coordenada simulada
+                lng: -69.9312 + (Math.random() - 0.5) * 0.05 
+            });
+            addressInput.value = '';
+            save();
+        }
+
+        function toggleDone(id) {
+            const stop = stops.find(s => s.id === id);
+            if (stop) stop.done = !stop.done;
+            save();
+        }
+
+        function optimizeRoute() {
+            const pending = stops.filter(s => !s.done);
+            const done = stops.filter(s => s.done);
+            stops = [...pending, ...done];
+            save();
+            switchTab('mapa');
+        }
+
+        function renderStops() {
+            const list = document.getElementById('stopsList');
+            list.innerHTML = '';
+            stops.forEach((stop, index) => {
+                const card = document.createElement('div');
+                card.className = `stop-card bg-white p-4 rounded-2xl border border-gray-100 flex items-center gap-4 shadow-sm ${stop.done ? 'done-item' : ''}`;
+                card.innerHTML = `
+                    <div class="flex-none"><div class="w-8 h-8 ${stop.done ? 'bg-gray-400' : 'bg-indigo-600'} text-white rounded-full flex items-center justify-center font-bold text-xs">${index + 1}</div></div>
+                    <div class="flex-grow min-w-0"><p class="text-sm font-bold truncate ${stop.done ? 'line-through text-gray-400' : 'text-gray-800'}">${stop.address}</p></div>
+                    <div class="flex gap-2">
+                        <button onclick="window.open('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('${stop.address}'), '_blank')" class="p-2 text-indigo-500 bg-indigo-50 rounded-xl">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        </button>
+                        <button onclick="toggleDone(${stop.id})" class="p-2 ${stop.done ? 'text-green-500 bg-green-50' : 'text-gray-300 bg-gray-50'} rounded-xl">
+                            <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                        </button>
+                    </div>`;
+                list.appendChild(card);
+            });
+            updateStats();
+        }
+
+        function updateMapMarkers() {
+            if (!markerLayer) return;
+            markerLayer.clearLayers();
+            const summary = document.getElementById('orderSummary');
+            summary.innerHTML = "";
+            const bounds = [];
+            stops.forEach((stop, i) => {
+                const color = stop.done ? '#9ca3af' : '#4f46e5';
+                const icon = L.divIcon({
+                    html: `<div style="background:${color}; color:white; border-radius:10px; padding:4px 8px; font-weight:900; font-size:12px; border:2px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.2)">${i+1}</div>`,
+                    className: '', iconSize: [30, 30]
+                });
+                L.marker([stop.lat, stop.lng], { icon }).addTo(markerLayer);
+                bounds.push([stop.lat, stop.lng]);
+                summary.innerHTML += `<div class="flex items-center gap-2 ${stop.done ? 'text-gray-300 line-through' : 'text-gray-700'}"><span>●</span> ${i+1}. ${stop.address}</div>`;
+            });
+            if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50] });
         }
 
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 video.srcObject = stream;
-                cameraContainer.classList.remove('hidden');
-            } catch (err) {
-                alert("Error de cámara. Verifique los permisos.");
-            }
+                document.getElementById('cameraContainer').classList.remove('hidden');
+            } catch (err) { alert("Error de acceso a cámara."); }
         }
 
         function stopCamera() {
-            const stream = video.srcObject;
-            if (stream) stream.getTracks().forEach(t => t.stop());
-            cameraContainer.classList.add('hidden');
+            if(video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+            document.getElementById('cameraContainer').classList.add('hidden');
         }
 
         async function takeSnapshot() {
-            const context = canvas.getContext('2d');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const c = document.createElement('canvas');
+            c.width = video.videoWidth; c.height = video.videoHeight;
+            c.getContext('2d').drawImage(video, 0, 0);
             stopCamera();
-            processImage(canvas.toDataURL('image/png'));
-        }
-
-        async function processImage(imageSrc) {
-            const loader = document.getElementById('ocrLoader');
-            loader.classList.remove('hidden');
+            document.getElementById('ocrLoader').classList.remove('hidden');
             try {
-                const result = await Tesseract.recognize(imageSrc, 'spa');
-                const text = result.data.text.trim();
-                if (text.length > 5) {
-                    const lines = text.split('\n').filter(l => l.trim().length > 5);
-                    document.getElementById('addressInput').value = lines[0] || text;
-                }
-            } catch (err) {
-                alert("No se pudo leer el texto.");
-            } finally {
-                loader.classList.add('hidden');
-            }
+                const res = await Tesseract.recognize(c.toDataURL(), 'spa');
+                if (res.data.text.trim()) addressInput.value = res.data.text.split('\n')[0];
+            } catch (e) { console.error(e); }
+            document.getElementById('ocrLoader').classList.add('hidden');
         }
 
-        function addStop() {
-            const input = document.getElementById('addressInput');
-            const address = input.value.trim();
-            if (address) {
-                stops.push({ id: Date.now(), address: address, done: false });
-                input.value = '';
-                saveToLocal();
-                renderStops();
-            }
+        function save() { 
+            localStorage.setItem('ruta_pro_vFinal', JSON.stringify(stops)); 
+            renderStops(); 
+            updateMapMarkers(); 
         }
 
-        function toggleDone(id) {
-            const stop = stops.find(s => s.id === id);
-            if (stop) stop.done = !stop.done;
-            saveToLocal();
-            renderStops();
+        function updateStats() {
+            document.getElementById('countTotal').innerText = stops.length;
+            document.getElementById('countDone').innerText = stops.filter(s => s.done).length;
         }
 
-        function removeStop(id) {
-            stops = stops.filter(s => s.id !== id);
-            saveToLocal();
-            renderStops();
-        }
-
-        function clearStops() {
-            if (confirm('¿Borrar todas las paradas?')) {
-                stops = [];
-                saveToLocal();
-                renderStops();
-            }
-        }
-
-        function optimizeRoute() {
-            // Simulamos optimización reordenando las no terminadas primero
-            const pending = stops.filter(s => !s.done);
-            const completed = stops.filter(s => s.done);
-            stops = [...pending, ...completed];
-            saveToLocal();
-            renderStops();
-        }
-
-        function openInMaps(address) {
-            const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-            window.open(url, '_blank');
-        }
-
-        function renderStops() {
-            const list = document.getElementById('stopsList');
-            const emptyState = document.getElementById('emptyState');
-            list.innerHTML = '';
-            
-            emptyState.style.display = stops.length === 0 ? 'block' : 'none';
-
-            stops.forEach((stop, index) => {
-                const card = document.createElement('div');
-                card.className = `stop-card flex items-center p-4 rounded-xl border ${stop.done ? 'done-item' : 'bg-white border-indigo-100 shadow-sm'}`;
-                card.innerHTML = `
-                    <div class="flex-none mr-3">
-                        <div class="w-7 h-7 ${stop.done ? 'bg-gray-400' : 'bg-indigo-600'} text-white rounded-full flex items-center justify-center font-bold text-xs">
-                            ${index + 1}
-                        </div>
-                    </div>
-                    <div class="flex-grow min-w-0">
-                        <p class="text-sm font-semibold text-gray-900 truncate ${stop.done ? 'line-through text-gray-400' : ''}">${stop.address}</p>
-                    </div>
-                    <div class="flex-none flex gap-1">
-                        <button onclick="openInMaps('${stop.address}')" class="p-2 text-blue-500 active:scale-90 transition-transform">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        </button>
-                        <button onclick="toggleDone(${stop.id})" class="p-2 ${stop.done ? 'text-green-600' : 'text-gray-300'} active:scale-90 transition-transform">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-                        </button>
-                    </div>
-                `;
-                list.appendChild(card);
-            });
-
-            const total = stops.length;
-            const done = stops.filter(s => s.done).length;
-            document.getElementById('countTotal').innerText = total;
-            document.getElementById('countDone').innerText = done;
-            document.getElementById('countPending').innerText = total - done;
-        }
-
-        document.getElementById('addressInput').addEventListener('keypress', e => { if (e.key === 'Enter') addStop(); });
+        function clearStops() { if (confirm('¿Reiniciar lista?')) { stops = []; save(); } }
     </script>
 </body>
 </html>
